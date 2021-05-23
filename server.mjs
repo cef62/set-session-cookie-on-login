@@ -1,71 +1,70 @@
 import fastify from 'fastify'
-import cookie from 'fastify-cookie'
-import cors from 'fastify-cors'
+import cookie from 'cookie'
+// import cookie from 'fastify-cookie'
+// import cors from 'fastify-cors'
 
 const app = fastify({ logger: true })
 
-app.register(cookie, {
-  secret: 'my-secret', // for cookies signature
-  parseOptions: {},
-})
-app.register(cors, {
-  origin: 'http://localhost:4000',
-  credentials: true,
-})
+const COOKIE_NAME = 'sticazzi';
+
+// TODO this should be some kind of middleware but fuck that
+function addAccessControlHeaders(request, reply) {
+  reply
+    .header('Access-Control-Allow-Origin', request.headers['origin'])
+    .header('Access-Control-Allow-Credentials', 'true');
+}
+
+function makeCookie(value, expires) {
+  return cookie.serialize(COOKIE_NAME, value, {
+    signed: true,
+    httpOnly: true,
+    sameSite: 'none',
+    path: '/',
+    secure: true,
+    expires
+  });
+}
+
+app.options('/*', async (request, reply) => {
+  addAccessControlHeaders(request, reply);
+  reply
+    .header('Access-Control-Allow-Methods', request.headers['access-control-request-method'])
+    .header('Access-Control-Allow-Headers', request.headers['access-control-request-headers'])
+    .send();
+});
 
 app.get('/', async (request, reply) => {
-  try {
-    const result = reply.unsignCookie(request.cookies.myCookie)
+  addAccessControlHeaders(request, reply);
+  const {[COOKIE_NAME]: c = null} = cookie.parse(request.headers.cookie || '');
+  if (c) {
+    return { message: `Hey ${c}` };
+  }
 
-    if (result.valid) {
-      // Setting the same cookie again, this time plugin will sign it with a new key
-      return { message: 'Hello Authorized User' }
-    }
-  } catch (e) {}
-
-  return { message: 'Who are you again?' }
+  return { message: 'Unauthorized' };
 })
 
-const createSessionSchema = {
-  body: {
-    type: 'object',
-    properties: {
-      name: { type: 'string' },
-    },
-  },
-}
-
 app.post(
-  '/session',
-  { schema: createSessionSchema },
+  '/login',
   async (request, reply) => {
-    const name = request.body.name
+    addAccessControlHeaders(request, reply);
+    reply
+      .header('Set-Cookie', makeCookie(request.body.name, new Date(Date.now() + 24*60*60*1000)))
+      .send({ message: 'Access granted!', logged: true });
+  }
+);
 
-    if (name === 'jack') {
-      reply
-        .setCookie('my-session', 'some session value', {
-          signed: true,
-          httpOnly: true,
-          sameSite: 'none',
-          path: '/',
-        })
-        .send({ message: 'Access granted!', logged: true })
-    } else {
-      reply
-        .clearCookie('my-session', {
-          signed: true,
-          httpOnly: true,
-          sameSite: 'none',
-          path: '/',
-        })
-        .send({ message: 'Who are you again?', logged: false })
-    }
-  },
-)
+app.get(
+  '/logout',
+  async (request, reply) => {
+    addAccessControlHeaders(request, reply);
+    reply
+      .header('Set-Cookie', makeCookie('', new Date(0)))
+      .send();
+  }
+);
 
-try {
-  await app.listen(3000, '127.0.0.1')
-} catch (err) {
-  app.log.error(err)
-  process.exit(1)
-}
+app.listen(3000, '127.0.0.1').catch(e => {
+  console.error(err);
+  process.exit(1);
+});
+console.log('Listening on localhost:3000');
