@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Test Cookie through REST API</title>
+  </head>
+
+  <body>
+    <script type="module">
+      async function init() {
+        const response = await fetch('http://127.0.0.1:3000', {
+          method: 'GET',
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'include', // include, *same-origin, omit
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          redirect: 'follow',
+          referrerPolicy: 'no-referrer',
+        })
+        const data = await response.json()
+        console.log(data)
+        mainMessage.innerHTML = data.message
+      }
+
+      async function createSession() {
+        console.log('click')
+
+        const response = await fetch('http://127.0.0.1:3000/session', {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'include', // include, *same-origin, omit
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          redirect: 'follow',
+          referrerPolicy: 'no-referrer',
+          body: JSON.stringify({ name: 'jack' }),
+          // body: { name: 'jack' },
+        })
+
+        const data = await response.json()
+        console.log(data)
+        
+        mainMessage.innerHTML = data.message
+      }
+      mainBtn.addEventListener('click', createSession)
+
+      init()
+    </script>
+
+    <h1 id="mainMessage"></h1>
+
+    <button id="mainBtn">Create session</button>
+  </body>
+</html>
